@@ -7,8 +7,11 @@
   "types": "dist/index.d.ts",
   "scripts": {
     "start": "node dist/index.js",
+    "test": "vitest run",
     "lint": "tsc",
-    "build": "tsup src/index.ts --format cjs,esm --dts"
+    "build": "tsup src/index.ts --format cjs,esm --dts",
+    "ci": "pnpm run lint && pnpm run test && pnpm run build",
+    "release": "pnpm run lint && pnpm run test && pnpm run build && changeset publish"
   },
   "author": "Ron Goldinfeld <rongoldinfeld56@gmail.com>",
   "license": "ISC",
@@ -17,11 +20,13 @@
     "url": "https://github.com/rongoldinfeld/node-standby.git"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.26.1",
     "@types/debug": "^4.1.7",
     "@types/node": "^18.15.10",
     "@types/uuid": "^9.0.1",
     "tsup": "^6.7.0",
-    "typescript": "^5.0.2"
+    "typescript": "^5.0.2",
+    "vitest": "^0.30.0"
   },
   "dependencies": {
     "debug": "^4.3.4",
