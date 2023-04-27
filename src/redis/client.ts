@@ -22,7 +22,7 @@ export const getInfo = async (
   return info;
 };
 
-export const setInfo = async (
+const setInfo = async (
   name: string,
   status: FnStatus,
   client: RedisClientType,
@@ -33,3 +33,14 @@ export const setInfo = async (
     EX: ttl,
   });
 };
+
+export const setAsActive = async (
+  key: string,
+  holder: string,
+  client: RedisClientType
+): Promise<void> => await setInfo(key, FnStatus.ACTIVE, client, holder, 2);
+
+export const setAsWaiting = async (
+  key: string,
+  client: RedisClientType
+): Promise<void> => setInfo(key, FnStatus.WAITING, client, "none");
