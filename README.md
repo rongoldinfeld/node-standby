@@ -16,8 +16,8 @@ import express, { Express, Request, Response } from "express";
 import { registerFunction } from "node-standby";
 import { RedisClientType, createClient } from "redis";
 
-const client: RedisClientType = createClient({ /* Your redis connection options */ });
-client.on("error", (err: Error) => console.error(`Redis Error: ${err.message}`));
+const redisClient: RedisClientType = createClient({ /* Your redis connection options */ });
+redisClient.on("error", (err: Error) => console.error(`Redis Error: ${err.message}`));
 
 const app: Express = express();
 const port = 3000;
@@ -35,8 +35,8 @@ const initApp = async () => {
 };
 
 (async () => {
-  await client.connect();
-  registerFunction(client, initApp, {
+  await redisClient.connect();
+  standby(redisClient, initApp, {
     name: `expressApp`, // can be a function too
     pollingIntervalSeconds: 1,
     ttlSeconds: 2, // must be larger then pollingIntervalSeconds otherwise an error is thrown
@@ -44,7 +44,7 @@ const initApp = async () => {
 })();
 ```
 
-When a request hits `GET http://localhost:3000` the process fails. If two identical process are running using `node-standby`, the backup will take place after the active has failed
+When a request hits `GET http://localhost:3000` the process fails. If two identical process are running using `node-standby`, the backup will take place almost IMMEDIATELY after the active has failed
 
 ## License
 
