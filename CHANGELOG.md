@@ -1,5 +1,11 @@
 # node-standby
 
+## 1.0.4
+
+### Patch Changes
+
+- d8c951d: move jest to dev dependency
+
 ## 1.0.3
 
 ### Patch Changes
