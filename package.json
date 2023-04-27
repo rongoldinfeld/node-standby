@@ -38,5 +38,11 @@
     "debug": "^4.3.4",
     "redis": "^4.6.5",
     "uuid": "^9.0.0"
-  }
+  },
+  "keywords": [
+    "real-time",
+    "standby",
+    "active-active",
+    "failover"
+  ]
 }
