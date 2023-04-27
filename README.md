@@ -1,7 +1,7 @@
 # Node Standby
 
-[![npm version](https://img.shields.io/npm/v/node-standby.svg)]
-[![npm downloads](https://img.shields.io/npm/dm/node-standby.svg)]
+![npm version](https://img.shields.io/npm/v/node-standby.svg)
+![npm downloads](https://img.shields.io/npm/dm/node-standby.svg)
 
 Node Standby is a lightweight library for managing distributed locks in Node.js. It is especially useful in scenarios where a task needs to be performed only once, and multiple instances of the same service are running in parallel. With Node Standby, you can ensure that only one instance of a service runs a specific task at any given time, even in a clustered environment.
 
@@ -53,10 +53,6 @@ The `options` object can have the following properties:
 Node Standby works by using Redis to create a distributed lock for a specific task. When a service starts, it checks the status of the task in Redis. If the task is not being performed by another instance of the service, the service sets the status of the task to "active" and performs the task. If the task is already being performed by another instance of the service, the service sets the status of the task to "waiting" and waits for the other instance to finish the task.
 
 Node Standby uses a polling mechanism to check the status of the task in Redis. This ensures that the status of the task is updated in a timely manner, and that the service can take action accordingly.
-
-## Contributing
-
-Contributions are welcome! Please see the [contribution guidelines](CONTRIBUTING.md) for more information.
 
 ## License
 
