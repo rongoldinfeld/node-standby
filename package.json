@@ -1,6 +1,6 @@
 {
   "name": "node-standby",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "A package that allows to create a standby process that can take over if the primary process fails for some reason",
   "main": "dist/index.js",
   "module": "dist/index.mjs",
