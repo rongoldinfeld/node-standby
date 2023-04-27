@@ -1,7 +1,7 @@
 # Node Standby
 
-![npm version](https://img.shields.io/npm/v/node-standby.svg)
-![npm downloads](https://img.shields.io/npm/dm/node-standby.svg)
+[![npm version](https://img.shields.io/npm/v/node-standby.svg)](https://www.npmjs.com/package/node-standby)
+[![npm downloads](https://img.shields.io/npm/dm/node-standby.svg)](https://www.npmjs.com/package/node-standby)
 
 Node Standby is a lightweight library for managing distributed locks in Node.js. It is especially useful in scenarios where a task needs to be performed only once, and multiple instances of the same service are running in parallel. With Node Standby, you can ensure that only one instance of a service runs a specific task at any given time, even in a clustered environment.
 
