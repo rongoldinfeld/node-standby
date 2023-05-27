@@ -1,139 +1,99 @@
-import { expect, jest, test } from "@jest/globals";
+import {Client, CreateMode, Event, Stat} from 'node-zookeeper-client';
+import {standby} from "./index";
 
-import { standby } from "./index";
-import { RedisClientType } from "redis";
-import { FnInfo, FnStatus } from "./types/fn";
 
-// test the register function
-describe(`registerFunction`, () => {
-  const getFn = jest.fn<(...args: any) => Promise<string | null>>();
-  const setFn = jest.fn();
-  const client: RedisClientType = {
-    get: getFn,
-    set: setFn,
-  } as unknown as RedisClientType;
+describe('Node Standby', () => {
+    let client: Client;
+    const mockCreate = jest.fn((path, mode, callback) => {
+        callback(null, `${path}/guid-n_1`);
+    });
+    const mockGetChildren = jest.fn((path, callback) => {
+        callback(null, ['guid-n_1']);
+    });
+    const mockExists = jest.fn()
 
-  beforeEach(() => jest.useFakeTimers());
+    let leaderCallback: jest.Mock<any, any, any>;
 
-  afterEach(() => jest.clearAllMocks());
+    beforeEach(() => {
+        jest.useFakeTimers();
+        leaderCallback = jest.fn();
 
-  const mockGet = (fnInfo: FnInfo | null): void => {
-    getFn.mockResolvedValueOnce(fnInfo ? JSON.stringify(fnInfo) : null);
-  };
-
-  test("should throw an error if polling interval is greater than ttl", async () => {
-    expect(() =>
-      standby(client, () => console.log("hello"), {
-        name: "something",
-        ttlSeconds: 2,
-        pollingIntervalSeconds: 3,
-      })
-    ).toThrowError(
-      `TTL can't be smaller than polling interval, otherwise key will expire before lookup`
-    );
-  });
-
-  describe("Returned redis values", () => {
-    test("should run the function provided once, if no value was set for key in redis", async () => {
-      getFn.mockResolvedValueOnce(null);
-      const fn = jest.fn();
-      standby(client, fn, {
-        name: "something",
-        ttlSeconds: 2,
-        pollingIntervalSeconds: 1,
-      });
-      await jest.advanceTimersToNextTimerAsync();
-      expect(fn).toBeCalledTimes(1);
+        client = {
+            create: mockCreate,
+            getChildren: mockGetChildren,
+            exists: mockExists
+        } as unknown as Client;
     });
 
-    test("should not run the provided function again if the holder is me and marked as active active", async () => {
-      const fn = jest.fn();
-      const holder = standby(client, fn, {
-        name: "something",
-        ttlSeconds: 2,
-        pollingIntervalSeconds: 1,
-      });
-
-      // returns null and activates function once
-      mockGet(null);
-      await jest.advanceTimersToNextTimerAsync(1);
-      expect(fn).toBeCalledTimes(1);
-
-      // returns that im the holder and the function is active
-      fn.mockClear();
-      mockGet({ holder, status: FnStatus.ACTIVE });
-      await jest.advanceTimersToNextTimerAsync(1);
-
-      expect(fn).toBeCalledTimes(0);
+    afterEach(() => {
+        jest.clearAllMocks();
+        jest.useRealTimers();
     });
 
-    test(`should not run the provided function is the holder is active and not me`, async () => {
-      const fn = jest.fn();
-      const holder = standby(client, fn, {
-        name: "something",
-        ttlSeconds: 2,
-        pollingIntervalSeconds: 1,
-      });
+    it('should register for leader election and execute callback when elected', async () => {
+        standby(client, leaderCallback);
+        await jest.advanceTimersToNextTimerAsync(1);
+        expect(mockCreate).toHaveBeenCalledWith('/election/guid-n_', CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
+        expect(mockGetChildren).toHaveBeenCalledWith('/election', expect.any(Function));
+        expect(leaderCallback).toHaveBeenCalled();
 
-      // returns that im not the holder and the function is active
-      mockGet({ holder: holder + "not me", status: FnStatus.ACTIVE });
-      await jest.advanceTimersToNextTimerAsync(1);
-
-      expect(fn).toBeCalledTimes(0);
     });
 
-    test(`should run the provided function is the holder is waiting and not me`, async () => {
-      const fn = jest.fn();
-      const holder = standby(client, fn, {
-        name: "something",
-        ttlSeconds: 2,
-        pollingIntervalSeconds: 1,
-      });
+    it('should watch znode changes and execute callback when becoming the new leader', async () => {
+        mockCreate.mockImplementation((path, mode, callback) => {
+            callback(null, `${path}/guid-n_2`);
+        });
 
-      // returns that im not the holder and the function is active
-      mockGet({ holder: holder + "not me", status: FnStatus.WAITING });
-      await jest.advanceTimersToNextTimerAsync(1);
+        mockGetChildren.mockImplementationOnce((path, callback) => {
+            callback(null, ['guid-n_1', 'guid-n_2']);
+        }).mockImplementationOnce((path, callback) => {
+            callback(null, ['guid-n_2']);
+        });
 
-      expect(fn).toBeCalledTimes(1);
+        mockExists.mockImplementationOnce((path, watcher, callback) => {
+            watcher({getType: () => Event.NODE_DELETED, path: `${path}/guid-n_1`});
+            callback(null, null);
+        });
+
+        standby(client, leaderCallback);
+        await jest.advanceTimersToNextTimerAsync(1);
+        expect(mockCreate).toHaveBeenCalledWith('/election/guid-n_', CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
+        expect(mockGetChildren).toHaveBeenCalledWith('/election', expect.any(Function));
+        expect(mockExists).toHaveBeenCalledWith('/election/guid-n_1', expect.any(Function), expect.any(Function));
+        expect(mockGetChildren).toHaveBeenCalledWith('/election', expect.any(Function));
+        expect(leaderCallback).toHaveBeenCalled();
     });
 
-    test(`should re mark the function is active, if get returned that the function is active and the holder is me`, async () => {
-      const fn = jest.fn();
-      const holder = standby(client, fn, {
-        name: "something",
-        ttlSeconds: 2,
-        pollingIntervalSeconds: 1,
-      });
-
-      // returns that im not the holder and the function is active
-      mockGet({ holder, status: FnStatus.ACTIVE });
-      await jest.advanceTimersToNextTimerAsync(1);
-
-      expect(setFn).toBeCalledWith(
-        "something",
-        JSON.stringify({ holder, status: FnStatus.ACTIVE }),
-        { EX: 2 }
-      );
+    it('should watch znode changes and continue watching the next znode down the sequence', async () => {
+        mockCreate.mockImplementationOnce((path, mode, callback) => {
+            callback(null, `${path}/guid-n_3`);
+        });
+        mockGetChildren.mockImplementationOnce((path, callback) => {
+            callback(null, ['guid-n_1', 'guid-n_2', 'guid-n_3']);
+        }).mockImplementationOnce((path, callback) => {
+            callback(null, ['guid-n_1', 'guid-n_3']);
+        }).mockImplementationOnce((path, callback) => {
+            callback(null, ['guid-n_3']);
+        });
+        mockExists.mockImplementationOnce((path, watcher, callback) => {
+            callback(null, {} as Stat);
+            watcher({getType: () => Event.NODE_DELETED, path: `${path}/guid-n_2`});
+        })
+        standby(client, leaderCallback);
+        await jest.advanceTimersToNextTimerAsync(1);
+        expect(mockCreate).toHaveBeenCalledWith('/election/guid-n_', CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
+        expect(mockGetChildren).toHaveBeenCalledWith('/election', expect.any(Function));
+        expect(mockExists).toHaveBeenCalledWith('/election/guid-n_1', expect.any(Function), expect.any(Function));
+        mockExists.mockImplementationOnce((path, watcher, callback) => {
+            callback(null, {});
+            watcher({getType: () => Event.NODE_DELETED, path: `${path}/guid-n_1`});
+        });
+        await jest.advanceTimersToNextTimerAsync(1);
+        expect(mockExists).toHaveBeenCalledWith('/election/guid-n_2', expect.any(Function), expect.any(Function));
+        expect(mockGetChildren).toHaveBeenCalledWith('/election', expect.any(Function));
+        expect(leaderCallback).toHaveBeenCalledTimes(0);
     });
 
-    test(`should set the function as waiting if the function provided throws an error`, async () => {
-      const fn = jest.fn().mockImplementationOnce(() => {
-        throw new Error("something went wrong");
-      });
 
-      standby(client, fn, {
-        name: "something",
-        ttlSeconds: 2,
-        pollingIntervalSeconds: 1,
-      });
-      mockGet(null);
-      await jest.advanceTimersToNextTimerAsync(1);
 
-      expect(setFn).toBeCalledWith(
-        "something",
-        JSON.stringify({ holder: "none", status: FnStatus.WAITING }),
-        { EX: undefined }
-      );
-    });
-  });
 });
