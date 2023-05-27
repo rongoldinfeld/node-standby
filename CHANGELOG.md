@@ -1,5 +1,11 @@
 # node-standby
 
+## 2.0.0
+
+### Major Changes
+
+- 3280da7: change redis dependency to zookeeper
+
 ## 1.0.5
 
 ### Patch Changes
