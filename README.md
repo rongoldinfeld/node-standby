@@ -1,64 +1,65 @@
-# Node Standby
+# Node Standby - Leader Election using ZooKeeper
 
 [![npm version](https://img.shields.io/npm/v/node-standby.svg)](https://www.npmjs.com/package/node-standby)
 [![npm downloads](https://img.shields.io/npm/dm/node-standby.svg)](https://www.npmjs.com/package/node-standby)
 
-`node-standby` is a library that aims to ensure continuous uptime of processes that should be running all the time. This is achieved by enabling two instances to be up and running simultaneously, while only one instance is actively processing. In case of a failure, the standby instance will take over, minimizing downtime until the failed instance can be replaced
+Node Standby is a lightweight library for implementing leader election using ZooKeeper in Node.js applications. It provides an easy way to elect a leader among a group of processes and handle leader failures efficiently. With Node Standby, you can ensure high availability and fault tolerance in your distributed systems, minimizing downtime for critical processes.
 
-## Features
+## Why Use Node Standby?
 
-- Enables a process to keep running even if one node instance is down, minimizing downtime.
-- Provides a simple and efficient way to implement a standby mechanism, ensuring that there is always a backup instance ready to take over in case of failure.
-- Supports multiple instances running concurrently, with only one active at a time, and automatic failover when the active instance goes down.
-- Uses Redis as a shared storage to store the state of the standby mechanism, ensuring consistency and availability across multiple processes and nodes.
+- **Simplified Leader Election**: Node Standby simplifies the process of leader election by handling the complexity of ZooKeeper interactions. You can focus on your application logic while Node Standby takes care of the underlying coordination.
+
+- **Efficient Failure Handling**: Node Standby minimizes the "herd effect" by watching the next znode down the sequence, avoiding unnecessary notifications and load on the ZooKeeper servers. This ensures efficient leader election without overwhelming the system.
+
+- **Seamless Integration**: Node Standby integrates seamlessly with your existing Node.js applications. It leverages the popular `node-zookeeper-client` library and provides a clean API for leader election, allowing you to easily incorporate it into your projects.
 
 ## Installation
 
-To install Node Standby, simply run the following command:
+Node Standby can be installed via npm:
 
-```sh
+```bash
 npm install node-standby
 ```
 
 ## Usage
 
-Here's an example of how to use Node Standby to ensure that only one instance of a service performs a specific task:
+```javascript
+import { ZooKeeperClient } from 'node-zookeeper-client';
+import { standby } from 'node-standby';
 
-```ts
-const redis = require('redis');
-const client = redis.createClient();
+// Create a ZooKeeper client instance
+const client = new ZooKeeperClient('zookeeper-server:2181');
 
-const standby = require('node-standby').standby;
+await client.connect();
 
-const myTask = () => {
-  // Perform the task here
-};
+// Define the callback function to be executed when elected as the leader
+function leaderCallback() {
+  // Your leader logic here
+  console.log('I am the leader!');
+}
 
-standby(client, myTask, { name: 'my-task' });
+// Register for leader election using Node Standby
+standby(client, leaderCallback);
 ```
 
-In this example, `standby` is called with three arguments:
+Make sure to replace `'zookeeper-server:2181'` with the actual address of your ZooKeeper server. When a process is elected as the leader, the `leaderCallback` function will be executed, allowing you to perform the necessary leader tasks.
 
-1. `client`: a Redis client instance.
-2. `myTask`: the task to be performed.
-3. `options`: an object containing options for the standby function.
+## Caveats
 
-The `options` object can have the following properties:
+- **ZooKeeper Dependency**: Node Standby relies on the `node-zookeeper-client` library, which is a dependency. Make sure to have ZooKeeper installed and running, and provide the correct ZooKeeper server address when creating the ZooKeeper client instance.
 
-- `name`: the name of the task. This can be a string or a function that returns a string (Representing the key in Redis).
-- `pollingIntervalMS`: the interval at which the status of the task is checked, in milli seconds.
-- `ttlMS`: the time to live (TTL) for the task, in milli seconds.
+- **Session Management**: Ensure that the ZooKeeper client's session remains active for the duration of leader election. If the client's session ends or disconnects, the ephemeral znodes created by Node Standby will be automatically deleted, triggering a new leader election.
 
-## How It Works
-
-The `node-standby` library provides a simple but effective way to ensure that a process keeps running even if one instance is down. The library works by using Redis as a shared storage to store the state of the standby mechanism.
-
-When the process starts, it creates a unique identifier (a UUID) that identifies this instance. It then starts a timer that periodically checks the status of the mechanism. If the mechanism is waiting or the current active instance has expired, the timer sets the status to active and starts running the process. If the mechanism is already active, the timer checks if the current active instance is this one. If it is, the timer simply resets the expiration time. If it's not, the timer goes back to sleep until the next interval.
-
-If the active instance fails, the next timer that wakes up will detect this and set the status to waiting, effectively triggering a failover. The next timer that wakes up will then become the new active instance and start running the process.
-
-By using Redis as a shared storage, the node-standby library ensures consistency and availability across multiple processes and nodes, making it a robust and scalable solution for implementing standby mechanisms in Node.js applications.
+- **Error Handling**: Proper error handling should be implemented in your application to handle potential failures and exceptions that may occur during the leader election process or ZooKeeper interactions.
 
 ## License
 
-Node Standby is licensed under the [MIT License](LICENSE).
+Node Standby is released under the MIT License. See the [LICENSE](LICENSE) file for details.
+
+---
+
+We hope that Node Standby simplifies your leader election implementation and contributes to the reliability of your distributed systems. Feel free to contribute, report issues, or suggest enhancements on our GitHub repository.
+
+Happy coding!
+
+---

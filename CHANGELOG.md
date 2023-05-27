@@ -1,5 +1,12 @@
 # node-standby
 
+## 1.0.5
+
+### Patch Changes
+
+- 080473a: clarify readme.md
+- d294059: fix readme links and text
+
 ## 1.0.4
 
 ### Patch Changes
