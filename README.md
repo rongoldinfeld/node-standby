@@ -30,8 +30,6 @@ import { standby } from 'node-standby';
 // Create a ZooKeeper client instance
 const client = new ZooKeeperClient('zookeeper-server:2181');
 
-await client.connect();
-
 // Define the callback function to be executed when elected as the leader
 function leaderCallback() {
   // Your leader logic here
@@ -39,7 +37,11 @@ function leaderCallback() {
 }
 
 // Register for leader election using Node Standby
-standby(client, leaderCallback);
+client.once('connected',()=>{
+    standby(client, leaderCallback);    
+})
+
+client.connect();
 ```
 
 Make sure to replace `'zookeeper-server:2181'` with the actual address of your ZooKeeper server. When a process is elected as the leader, the `leaderCallback` function will be executed, allowing you to perform the necessary leader tasks.
