@@ -1,5 +1,11 @@
 # node-standby
 
+## 2.1.0
+
+### Minor Changes
+
+- d06341d: added error handling for disconnection, while leader callback is executing
+
 ## 2.0.0
 
 ### Major Changes
