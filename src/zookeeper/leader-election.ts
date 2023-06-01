@@ -1,7 +1,8 @@
-import { Client, CreateMode, Event } from "node-zookeeper-client";
+import { Client, CreateMode, Event, State } from "node-zookeeper-client";
 import debug from "debug";
 
 const sequenceLogger = debug("node-standby:sequence");
+const connectionLogger = debug("node-standby:connection");
 
 const getLoggerForSequence =
   (sequence: number) =>
@@ -9,13 +10,59 @@ const getLoggerForSequence =
     sequenceLogger(`[Sequence: ${sequence}] ${message}`, ...args);
 
 const getSequenceFromPath = (path: string): number =>
-  parseInt(path.substr(path.lastIndexOf("_") + 1), 10);
+  parseInt(path.substring(path.lastIndexOf("_") + 1), 10);
 
-export const registerCallback = (
+const throwDisconnectAfterThreshold = (
   client: Client,
-  callback: Function,
-  electionPath: string = `/election`
+  timeoutThreshold: number,
+  cleanup?: Function
 ) => {
+  client.on("disconnected", () => {
+    connectionLogger(
+      `Received disconnected event!, status will be checked again in: %dms`,
+      timeoutThreshold
+    );
+    setTimeout(() => {
+      const state = client.getState();
+      connectionLogger(
+        `Current connection state after the last disconnect: %s`,
+        state.name
+      );
+      if (state.code === State.DISCONNECTED.code) {
+        connectionLogger(
+          `Threshold reached, running cleanup function and throwing disconnect error`
+        );
+        cleanup && cleanup();
+        throw new Error("Zookeeper client disconnected");
+      } else {
+        connectionLogger("Reconnected before threshold was reached");
+      }
+    }, timeoutThreshold);
+  });
+};
+
+export interface CallbackParams {
+  client: Client;
+  callback: (sequence: number) => Function | undefined;
+  threshold: number;
+  electionPath?: string;
+}
+
+export const registerForLeaderElection = ({
+  client,
+  callback,
+  threshold,
+  electionPath = `/election`,
+}: CallbackParams) => {
+  const sessionTimeout: number = client.getSessionTimeout();
+  const timeoutThreshold: number = sessionTimeout * threshold;
+
+  if (threshold > 1) {
+    connectionLogger(
+      `Threshold > 1, which means the process will still be active even after session timeout`
+    );
+  }
+
   // Volunteering to be a leader
   client.create(
     `${electionPath}/guid-n_`,
@@ -44,7 +91,8 @@ export const registerCallback = (
 
         if (smallerChildren.length === 0) {
           logger("No smaller sequence, elected as the leader");
-          callback();
+          const cleanup = callback(sequenceNumber);
+          throwDisconnectAfterThreshold(client, timeoutThreshold, cleanup);
         } else {
           logger("Smaller sequences: %s", children.map(getSequenceFromPath));
           const watchNodePath: string =
@@ -77,7 +125,8 @@ export const registerCallback = (
               logger(
                 `Elected as the new leader since ${currentSequence} is the smallest sequence`
               );
-              callback();
+              const cleanup = callback(currentSequence);
+              throwDisconnectAfterThreshold(client, timeoutThreshold, cleanup);
             } else {
               // Watch the next znode down the sequence
               watchZNodeChanges(smallestChild, currentSequence);
