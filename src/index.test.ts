@@ -69,7 +69,7 @@ describe("Node Standby", () => {
 
     mockExists.mockImplementationOnce((path, watcher, callback) => {
       watcher({ getType: () => Event.NODE_DELETED, path: `${path}/guid-n_1` });
-      callback(null, null);
+      callback(null, {});
     });
 
     standby({ client, threshold: 0.7, callback: leaderCallback });
