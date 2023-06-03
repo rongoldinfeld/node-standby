@@ -23,14 +23,9 @@ describe("Node Standby", () => {
       exists: mockExists,
       getState: jest.fn(() => ({ name: "SYNC_CONNECTED" })),
       getSessionTimeout: jest.fn(() => 3000),
-      on: jest.fn(
-        (
-          event: string,
-          callback: (error: Error | null, stat: Stat) => void
-        ) => {
-          callback(null, {} as Stat);
-        }
-      ),
+      on: jest.fn((event: string, callback: (error: Error | null, stat: Stat) => void) => {
+        callback(null, {} as Stat);
+      }),
     } as unknown as Client;
   });
 
@@ -42,15 +37,8 @@ describe("Node Standby", () => {
   it("should register for leader election and execute callback when elected", async () => {
     standby({ client, threshold: 0.7, callback: leaderCallback });
     await jest.advanceTimersToNextTimerAsync(1);
-    expect(mockCreate).toHaveBeenCalledWith(
-      "/election/guid-n_",
-      CreateMode.EPHEMERAL_SEQUENTIAL,
-      expect.any(Function)
-    );
-    expect(mockGetChildren).toHaveBeenCalledWith(
-      "/election",
-      expect.any(Function)
-    );
+    expect(mockCreate).toHaveBeenCalledWith("/election/guid-n_", CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
+    expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));
     expect(leaderCallback).toHaveBeenCalled();
   });
 
@@ -74,24 +62,10 @@ describe("Node Standby", () => {
 
     standby({ client, threshold: 0.7, callback: leaderCallback });
     await jest.advanceTimersToNextTimerAsync(1);
-    expect(mockCreate).toHaveBeenCalledWith(
-      "/election/guid-n_",
-      CreateMode.EPHEMERAL_SEQUENTIAL,
-      expect.any(Function)
-    );
-    expect(mockGetChildren).toHaveBeenCalledWith(
-      "/election",
-      expect.any(Function)
-    );
-    expect(mockExists).toHaveBeenCalledWith(
-      "/election/guid-n_1",
-      expect.any(Function),
-      expect.any(Function)
-    );
-    expect(mockGetChildren).toHaveBeenCalledWith(
-      "/election",
-      expect.any(Function)
-    );
+    expect(mockCreate).toHaveBeenCalledWith("/election/guid-n_", CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
+    expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));
+    expect(mockExists).toHaveBeenCalledWith("/election/guid-n_1", expect.any(Function), expect.any(Function));
+    expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));
     expect(leaderCallback).toHaveBeenCalled();
   });
 
@@ -115,34 +89,16 @@ describe("Node Standby", () => {
     });
     standby({ client, threshold: 0.7, callback: leaderCallback });
     await jest.advanceTimersToNextTimerAsync(1);
-    expect(mockCreate).toHaveBeenCalledWith(
-      "/election/guid-n_",
-      CreateMode.EPHEMERAL_SEQUENTIAL,
-      expect.any(Function)
-    );
-    expect(mockGetChildren).toHaveBeenCalledWith(
-      "/election",
-      expect.any(Function)
-    );
-    expect(mockExists).toHaveBeenCalledWith(
-      "/election/guid-n_1",
-      expect.any(Function),
-      expect.any(Function)
-    );
+    expect(mockCreate).toHaveBeenCalledWith("/election/guid-n_", CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
+    expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));
+    expect(mockExists).toHaveBeenCalledWith("/election/guid-n_1", expect.any(Function), expect.any(Function));
     mockExists.mockImplementationOnce((path, watcher, callback) => {
       callback(null, {});
       watcher({ getType: () => Event.NODE_DELETED, path: `${path}/guid-n_1` });
     });
     await jest.advanceTimersToNextTimerAsync(1);
-    expect(mockExists).toHaveBeenCalledWith(
-      "/election/guid-n_2",
-      expect.any(Function),
-      expect.any(Function)
-    );
-    expect(mockGetChildren).toHaveBeenCalledWith(
-      "/election",
-      expect.any(Function)
-    );
+    expect(mockExists).toHaveBeenCalledWith("/election/guid-n_2", expect.any(Function), expect.any(Function));
+    expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));
     expect(leaderCallback).toHaveBeenCalledTimes(0);
   });
 });
