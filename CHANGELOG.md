@@ -1,5 +1,12 @@
 # node-standby
 
+## 2.2.0
+
+### Minor Changes
+
+- 3cb247d: reformating and readme file update and removed redundant dependency
+- 3cb247d: added error handling for disconnection, while leader callback is executing
+
 ## 2.1.0
 
 ### Minor Changes
