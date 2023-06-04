@@ -15,7 +15,7 @@
     "release": "pnpm run lint && pnpm run test && pnpm run build && changeset publish"
   },
   "author": "Ron Goldinfeld <rongoldinfeld56@gmail.com>",
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/rongoldinfeld/node-standby.git"
