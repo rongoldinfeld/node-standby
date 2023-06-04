@@ -15,7 +15,7 @@
     "release": "pnpm run lint && pnpm run test && pnpm run build && changeset publish"
   },
   "author": "Ron Goldinfeld <rongoldinfeld56@gmail.com>",
-  "license": "ISC",
+  "license": "MIT",
   "repository": {
     "type": "git",
     "url": "https://github.com/rongoldinfeld/node-standby.git"
@@ -34,8 +34,10 @@
   },
   "dependencies": {
     "debug": "^4.3.4",
-    "node-zookeeper-client": "^1.1.3",
-    "uuid": "^9.0.0"
+    "node-zookeeper-client": "^1.1.3"
+  },
+  "prettier": {
+    "printWidth": 120
   },
   "keywords": [
     "real-time",
