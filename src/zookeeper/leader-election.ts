@@ -1,4 +1,4 @@
-import { Client, CreateMode, Event, State } from "node-zookeeper-client";
+import { Client, CreateMode, Event, Exception, Stat, State } from "node-zookeeper-client";
 import debug from "debug";
 import { createAsyncZookeeperAdapter, ZookeeperAsyncAdapter } from "./client-async";
 
@@ -7,6 +7,7 @@ export interface CallbackParams {
   callback: (sequence: number) => Function | undefined;
   threshold: number;
   electionPath?: string;
+  createElectionPathIfMissing?: boolean;
 }
 
 const seqLogger = debug("node-standby:sequence");
@@ -34,6 +35,33 @@ const throwDisconnectAfterThreshold = (client: Client, timeoutThreshold: number,
       }
     }, timeoutThreshold);
   });
+};
+
+const checkElectionPathExist = async (client: Client, electionPath: string): Promise<boolean> => {
+  return new Promise<boolean>((resolve, reject) => {
+    client.exists(electionPath, (error: Error | Exception, stat: Stat) => {
+      if (error) {
+        reject(`Failed at checking if electionPath exist: ${error}`);
+      } else {
+        resolve(!!stat);
+      }
+    });
+  });
+};
+
+const createElectionPath = async (client: Client, electionPath: string): Promise<boolean> => {
+  const pathExist: boolean = await checkElectionPathExist(client, electionPath);
+  return pathExist
+    ? true
+    : new Promise((resolve, reject) => {
+        client.mkdirp(electionPath, (error: Error | Exception) => {
+          if (error) {
+            reject(`Failed creating electionPath: ${error}`);
+          } else {
+            resolve(true);
+          }
+        });
+      });
 };
 
 const createNode = async (client: ZookeeperAsyncAdapter, electionPath: string): Promise<string> => {
@@ -64,6 +92,7 @@ export const registerForLeaderElection = async ({
   callback,
   threshold,
   electionPath = `/election`,
+  createElectionPathIfMissing = true,
 }: CallbackParams) => {
   const sessionTimeout: number = client.getSessionTimeout();
   const timeoutThreshold: number = sessionTimeout * threshold;
@@ -73,7 +102,7 @@ export const registerForLeaderElection = async ({
   }
 
   const asyncClient = createAsyncZookeeperAdapter(client);
-
+  createElectionPathIfMissing && (await createElectionPath(client, electionPath));
   const createdNodePath = await createNode(asyncClient, electionPath);
   const sequenceNumber = getSequenceFromPath(createdNodePath);
   const logger = getLoggerForSequence(sequenceNumber);
