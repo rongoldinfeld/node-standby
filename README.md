@@ -24,32 +24,33 @@ npm install node-standby
 ## Usage
 
 ```typescript
-import { ZooKeeperClient } from 'node-zookeeper-client';
-import { registerForLeaderElection } from 'node-standby';
+import { createClient } from "node-zookeeper-client";
+import { standby } from "node-standby";
 
 // Create a ZooKeeper client instance
-const client = new ZooKeeperClient('zookeeper-server:2181');
+const client = createClient('zookeeper-server:2181');
 
 // Define the callback function to be executed when elected as the leader
 function leaderCallback(sequence) {
     // Your leader logic here
     console.log(`I am the leader! Sequence: ${sequence}`);
+    return undefined;
 }
 
 // Register for leader election using Node Standby
-client.once('connected', () => {
+client.once("connected", () => {
     standby({
-        // node-zookeeper-client client
-        client: client, 
-        // the callback to be executed when the leader is elected */
-        callback: leaderCallback,
-        // represents the number of session timeouts a process can endure before being considered inactive
-        // it is recommended to set threshold to a number below 1
-        // the timeout will be calculated as follows = sessionTimeout * threshold 
-        threshold: 0.7,
-        // adjust the path if needed 
-        electionPath: '/election'
-    });
+      // node-zookeeper-client client
+      client: client,
+      // the callback to be executed when the leader is elected */
+      callback: leaderCallback,
+      // represents the number of session timeouts a process can endure before being considered inactive
+      // it is recommended to set threshold to a number below 1
+      // the timeout will be calculated as follows = sessionTimeout * threshold
+      threshold: 0.7,
+      // adjust the path if needed
+      electionPath: "/election",
+    }).catch(onrejected=> console.log(onrejected));
 });
 
 client.connect();
