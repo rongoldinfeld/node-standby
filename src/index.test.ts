@@ -35,7 +35,7 @@ describe("Node Standby", () => {
   });
 
   it("should register for leader election and execute callback when elected", async () => {
-    standby({ client, threshold: 0.7, callback: leaderCallback });
+    standby({ client, threshold: 0.7, callback: leaderCallback, createElectionPathIfMissing: false });
     await jest.advanceTimersToNextTimerAsync(1);
     expect(mockCreate).toHaveBeenCalledWith("/election/guid-n_", CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
     expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));
@@ -60,7 +60,7 @@ describe("Node Standby", () => {
       callback(null, {});
     });
 
-    standby({ client, threshold: 0.7, callback: leaderCallback });
+    standby({ client, threshold: 0.7, callback: leaderCallback, createElectionPathIfMissing: false });
     await jest.advanceTimersToNextTimerAsync(1);
     expect(mockCreate).toHaveBeenCalledWith("/election/guid-n_", CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
     expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));
@@ -87,7 +87,7 @@ describe("Node Standby", () => {
       callback(null, {} as Stat);
       watcher({ getType: () => Event.NODE_DELETED, path: `${path}/guid-n_2` });
     });
-    standby({ client, threshold: 0.7, callback: leaderCallback });
+    standby({ client, threshold: 0.7, callback: leaderCallback, createElectionPathIfMissing: false });
     await jest.advanceTimersToNextTimerAsync(1);
     expect(mockCreate).toHaveBeenCalledWith("/election/guid-n_", CreateMode.EPHEMERAL_SEQUENTIAL, expect.any(Function));
     expect(mockGetChildren).toHaveBeenCalledWith("/election", expect.any(Function));

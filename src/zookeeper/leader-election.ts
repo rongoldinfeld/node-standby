@@ -1,4 +1,4 @@
-import { Client, CreateMode, Event, State } from "node-zookeeper-client";
+import { Client, CreateMode, Event, Exception, Stat, State } from "node-zookeeper-client";
 import debug from "debug";
 import { createAsyncZookeeperAdapter, ZookeeperAsyncAdapter } from "./client-async";
 
@@ -7,6 +7,7 @@ export interface CallbackParams {
   callback: (sequence: number) => Function | undefined;
   threshold: number;
   electionPath?: string;
+  createElectionPathIfMissing?: boolean;
 }
 
 const seqLogger = debug("node-standby:sequence");
@@ -36,34 +37,45 @@ const throwDisconnectAfterThreshold = (client: Client, timeoutThreshold: number,
   });
 };
 
-const createNode = async (client: ZookeeperAsyncAdapter, electionPath: string): Promise<string> => {
-  const [creationError, createdNodePath] = await client.createAsync(
-    `${electionPath}/guid-n_`,
-    CreateMode.EPHEMERAL_SEQUENTIAL
+const checkElectionPathExist = async (client: Client, electionPath: string): Promise<boolean> => {
+  return new Promise<boolean>((resolve, reject) =>
+    client.exists(electionPath, (error: Error | Exception, stat: Stat) => {
+      if (error) {
+        reject(`Failed at checking if electionPath exist: ${error}`);
+      } else {
+        resolve(!!stat);
+      }
+    })
   );
-
-  if (creationError) {
-    throw new Error(`Failed at creating znode: ${creationError}`);
-  }
-
-  return createdNodePath;
 };
 
-const getChildren = async (client: ZookeeperAsyncAdapter, electionPath: string): Promise<string[]> => {
-  const [getChildrenError, children] = await client.getChildrenAsync(electionPath);
-
-  if (getChildrenError) {
-    throw new Error(`Failed to get children: ${getChildrenError}`);
-  }
-
-  return children;
+const createElectionPath = async (client: Client, electionPath: string): Promise<boolean> => {
+  const pathExist: boolean = await checkElectionPathExist(client, electionPath);
+  return pathExist
+    ? true
+    : new Promise((resolve, reject) => {
+        client.mkdirp(electionPath, (error: Error | Exception) => {
+          if (error) {
+            reject(`Failed creating electionPath: ${error}`);
+          } else {
+            resolve(true);
+          }
+        });
+      });
 };
+
+const createNode = async (client: ZookeeperAsyncAdapter, electionPath: string): Promise<string> =>
+  await client.createAsync(`${electionPath}/guid-n_`, CreateMode.EPHEMERAL_SEQUENTIAL);
+
+const getChildren = async (client: ZookeeperAsyncAdapter, electionPath: string): Promise<string[]> =>
+  await client.getChildrenAsync(electionPath);
 
 export const registerForLeaderElection = async ({
   client,
   callback,
   threshold,
   electionPath = `/election`,
+  createElectionPathIfMissing = true,
 }: CallbackParams) => {
   const sessionTimeout: number = client.getSessionTimeout();
   const timeoutThreshold: number = sessionTimeout * threshold;
@@ -73,7 +85,7 @@ export const registerForLeaderElection = async ({
   }
 
   const asyncClient = createAsyncZookeeperAdapter(client);
-
+  createElectionPathIfMissing && (await createElectionPath(client, electionPath));
   const createdNodePath = await createNode(asyncClient, electionPath);
   const sequenceNumber = getSequenceFromPath(createdNodePath);
   const logger = getLoggerForSequence(sequenceNumber);
@@ -94,12 +106,12 @@ export const registerForLeaderElection = async ({
     logger("Smaller sequences: %s", children.map(getSequenceFromPath));
     const watchNodePath: string = smallerChildren.sort()[smallerChildren.length - 1];
     logger(`Largest znode with a smaller sequence number %d`, getSequenceFromPath(watchNodePath));
-    watchZNodeChanges(watchNodePath, getSequenceFromPath(createdNodePath));
+    await watchZNodeChanges(watchNodePath, getSequenceFromPath(createdNodePath));
   }
 
   async function watchZNodeChanges(watchNodePath: string, currentSequence: number) {
     const logger = getLoggerForSequence(currentSequence);
-    const [existsError] = await asyncClient.watchAsync(`${electionPath}/${watchNodePath}`, async (event) => {
+    await asyncClient.watchAsync(`${electionPath}/${watchNodePath}`, async (event) => {
       if (event.getType() === Event.NODE_DELETED) {
         logger(`Received delete event %d`, getSequenceFromPath(event.path));
 
@@ -112,13 +124,9 @@ export const registerForLeaderElection = async ({
           throwDisconnectAfterThreshold(client, timeoutThreshold, cleanup);
         } else {
           // Watch the next znode down the sequence
-          watchZNodeChanges(smallestChild, currentSequence);
+          await watchZNodeChanges(smallestChild, currentSequence);
         }
       }
     });
-
-    if (existsError) {
-      throw new Error(`Watch failed. ${existsError}`);
-    }
   }
 };
